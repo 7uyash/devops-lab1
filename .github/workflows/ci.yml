@@ -1,4 +1,4 @@
-name: CI
+name: CI-CD Pipeline
 
 on:
   push:
@@ -6,10 +6,13 @@ on:
   pull_request:
     branches: [ "main" ]
 
-jobs:
-  build-and-test:
-    runs-on: ubuntu-latest
+permissions:
+  contents: write
 
+jobs:
+  build:
+    name: 1. Build
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -22,5 +25,84 @@ jobs:
       - name: Install dependencies
         run: pip install pytest
 
-      - name: Run tests
+      - name: Compile check (build step)
+        run: python -m py_compile app.py test_app.py
+
+      - name: Upload source as build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: source-build
+          path: |
+            app.py
+            test_app.py
+            README.md
+
+  test:
+    name: 2. Test
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install pytest
+
+      - name: Run unit tests
         run: pytest -v
+
+  package:
+    name: 3. Package
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: source-build
+          path: dist-src
+
+      - name: Create versioned release package
+        run: |
+          mkdir -p dist
+          zip -j dist/devops-lab1-v1.0.${{ github.run_number }}.zip dist-src/app.py dist-src/test_app.py dist-src/README.md
+
+      - name: Upload package artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-package
+          path: dist/*.zip
+
+  deploy:
+    name: 4. Deploy (GitHub Release)
+    needs: package
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download package artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: release-package
+          path: dist
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v1.0.${{ github.run_number }}
+          name: Release v1.0.${{ github.run_number }}
+          files: dist/*.zip
+          body: |
+            Automated deployment from CI/CD pipeline.
+            Commit: ${{ github.sha }}
+            Workflow run: ${{ github.run_id }}
