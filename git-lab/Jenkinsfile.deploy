@@ -1,0 +1,38 @@
+// Declarative pipeline: Build -> Test -> Deploy
+pipeline {
+    agent any
+
+    environment {
+        PY         = 'C:\\Python312\\python.exe'
+        DEPLOY_DIR = 'C:\\Users\\7uyas\\deploy\\devops-git-lab'
+    }
+
+    stages {
+        stage('Build') {
+            steps {
+                echo 'Compiling Python sources...'
+                bat '%PY% -m py_compile app.py login.py'
+            }
+        }
+        stage('Test') {
+            steps {
+                echo 'Running tests...'
+                bat '%PY% app.py'
+                bat '%PY% -c "from login import login; assert login(\'Suyash\') == \'Welcome Suyash\'; print(\'Test passed: login()\')"'
+            }
+        }
+        stage('Deploy') {
+            steps {
+                echo "Deploying to ${env.DEPLOY_DIR}..."
+                bat 'if not exist "%DEPLOY_DIR%" mkdir "%DEPLOY_DIR%"'
+                bat 'copy /Y app.py "%DEPLOY_DIR%" && copy /Y login.py "%DEPLOY_DIR%" && copy /Y README.md "%DEPLOY_DIR%"'
+                bat 'cd /d "%DEPLOY_DIR%" && dir /b && %PY% app.py'
+            }
+        }
+    }
+
+    post {
+        success { echo "Pipeline completed: Build, Test and Deploy succeeded (build #${env.BUILD_NUMBER})" }
+        failure { echo 'Pipeline failed' }
+    }
+}
