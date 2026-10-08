@@ -10,3 +10,4 @@ Suyash Sahu — Roll No. 2301010476 — K R Mangalam University
 - `app.py` — basic arithmetic functions
 - `test_app.py` — unit tests (pytest)
 - `.github/workflows/ci.yml` — CI pipeline that installs dependencies and runs tests on every push/PR
+- `Jenkinsfile` — Jenkins pipeline: SCM-polling trigger, build, test, package, deploy, post-build actions
